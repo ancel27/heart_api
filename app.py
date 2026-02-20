@@ -1,34 +1,41 @@
-# app.py
-
-from flask import Flask, request, jsonify
+# main.py
+from fastapi import FastAPI
+from pydantic import BaseModel
 import joblib
 import pandas as pd
 
-app = Flask(__name__)
+# Load model pipeline
+pipeline = joblib.load("heart_model_pipeline.pkl")
 
-model = joblib.load("heart_model_pipeline.pkl")
+app = FastAPI(title="Heart Disease Prediction API")
 
-@app.route("/")
+# Define input schema
+class HeartInput(BaseModel):
+    age: int
+    gender: int
+    BMI: float
+    systolic_bp: int
+    diastolic_bp: int
+    cholesterol_total_mg_dl: float
+    ldl_direct_mg_dl: float
+    hdl_cholesterol_mg_dl: float
+    triglycerides_mg_dl: float
+    vldl_cholesterol_mg_dl: float
+    cholesterol_hdl_chol_ratio: float
+    blood_sugar_fasting_mg_dl: float
+    glucose_post_prandial_mg_dl: float
+    creatinine_mg_dl: float
+    blood_urea_mg_dl: float
+
+# Root endpoint
+@app.get("/")
 def home():
-    return jsonify({"message": "Heart Disease Prediction API Running"})
+    return {"message": "Heart Disease Prediction API Running"}
 
-@app.route("/predict", methods=["POST"])
-def predict():
-    try:
-        data = request.get_json()
-        input_df = pd.DataFrame([data])
-
-        prediction = int(model.predict(input_df)[0])
-        probability = float(model.predict_proba(input_df)[0][1])
-
-        return jsonify({
-            "prediction": prediction,
-            "risk_probability": round(probability * 100, 2)
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+# Predict endpoint
+@app.post("/predict")
+def predict(input_data: HeartInput):
+    df = pd.DataFrame([input_data.dict()])
+    pred = pipeline.predict(df)[0]
+    prob = pipeline.predict_proba(df)[0][1]  # probability of heart disease
+    return {"heart_disease": int(pred), "risk_probability": round(prob*100, 2)}
